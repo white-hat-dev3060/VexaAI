@@ -1,1 +1,200 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>VexaAI</title>
 
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+        darkMode: 'class',
+        theme: {
+            extend: {
+                colors: {
+                    gemini: {
+                        50: '#F0F4F9',
+                        100: '#E1E5EA',
+                        800: '#1F1F1F',
+                        900: '#131314',
+                        accent: '#4285F4'
+                    }
+                },
+                fontFamily: {
+                    sans: ['Inter', 'sans-serif'],
+                    mono: ['Fira Code', 'monospace'],
+                }
+            }
+        }
+    }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Fira+Code:wght@400&display=swap" rel="stylesheet">
+
+<style>
+html, body { height:100%; height:100dvh; overscroll-behavior:none; }
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:3px; }
+.dark ::-webkit-scrollbar-thumb { background:#374151; }
+
+.prose pre { background-color:#1e1e1e !important; padding:1rem; border-radius:0.5rem; overflow-x:auto; }
+.prose code { color:#ef4444; background-color:rgba(0,0,0,0.05); padding:0.1rem 0.3rem; border-radius:0.2rem; font-size:0.9em; }
+.dark .prose code { color:#93c5fd; background-color:rgba(255,255,255,0.1); }
+.prose pre code { color:inherit; background-color:transparent; padding:0; }
+
+.loader { border:4px solid #f3f3f3; border-top:4px solid #3498db; border-radius:50%; width:40px; height:40px; animation:spin 1s linear infinite; }
+@keyframes spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
+
+.no-scrollbar::-webkit-scrollbar { display:none; }
+.no-scrollbar { -ms-overflow-style:none; scrollbar-width:none; }
+</style>
+</head>
+
+<body class="bg-white dark:bg-gemini-900 text-gray-800 dark:text-gray-100 transition-colors duration-200">
+
+<div id="loading" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white dark:bg-gemini-900">
+    <div class="loader mb-4"></div>
+    <div class="text-sm font-medium text-gray-500">Initializing Interface...</div>
+</div>
+
+<div id="app" class="flex h-full h-[100dvh] overflow-hidden hidden">
+
+    <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-20 hidden lg:hidden glass backdrop-blur-sm" onclick="toggleSidebar()"></div>
+
+    <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 w-72 bg-gray-50 dark:bg-[#1E1E1E] border-r border-gray-200 dark:border-gray-700 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 z-30 flex flex-col">
+        <div class="p-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
+            <button onclick="createNewChat()" class="flex-1 flex items-center gap-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 px-4 py-2.5 rounded-full text-sm font-medium transition-colors">
+                <i class="ph ph-plus text-lg"></i>
+                <span>New Chat</span>
+            </button>
+            <button onclick="toggleSidebar()" class="lg:hidden ml-2 p-2 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg">
+                <i class="ph ph-x text-xl"></i>
+            </button>
+        </div>
+
+        <div id="chatHistory" class="flex-1 overflow-y-auto p-3 space-y-1"></div>
+
+        <div class="p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
+            <button onclick="openSettings()" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-sm transition-colors">
+                <i class="ph ph-gear text-lg"></i>
+                <span>Settings</span>
+            </button>
+            <button onclick="toggleDarkMode()" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-sm transition-colors">
+                <i id="themeIcon" class="ph ph-moon text-lg"></i>
+                <span id="themeText">Dark Mode</span>
+            </button>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col h-full w-full relative">
+        
+        <header class="lg:hidden flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gemini-900 sticky top-0 z-10">
+            <button onclick="toggleSidebar()" class="p-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                <i class="ph ph-list text-2xl"></i>
+            </button>
+            <span class="font-medium text-sm text-gray-500 dark:text-gray-400" id="currentModelDisplayHeader">Gemini Clone</span>
+            <div class="w-8"></div> 
+        </header>
+
+        <div id="messagesContainer" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 scroll-smooth">
+            <div id="welcomeState" class="h-full flex flex-col items-center justify-center text-center opacity-100 transition-opacity duration-300">
+                <div class="w-16 h-16 bg-gradient-to-tr from-blue-500 to-purple-500 rounded-2xl mb-6 shadow-lg animate-pulse"></div>
+                <h1 class="text-2xl md:text-4xl font-semibold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">Hello, User</h1>
+                <p class="text-gray-500 dark:text-gray-400 max-w-md">How can I help you today?</p>
+            </div>
+        </div>
+
+        <button id="scrollBtn" onclick="scrollToBottom()" class="absolute bottom-24 right-6 p-2 bg-white dark:bg-gray-700 shadow-lg rounded-full hidden transition-transform hover:scale-110 z-10 border border-gray-200 dark:border-gray-600">
+            <i class="ph ph-arrow-down text-xl"></i>
+        </button>
+
+        <div class="p-4 bg-white dark:bg-gemini-900">
+            <div class="max-w-4xl mx-auto relative group">
+                <textarea 
+                    id="promptInput"
+                    rows="1"
+                    placeholder="Ask anything..."
+                    class="w-full bg-gray-100 dark:bg-[#1E1E1E] text-gray-900 dark:text-white rounded-3xl pl-5 pr-14 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none overflow-hidden max-h-48 transition-all"
+                    oninput="autoResize(this)"
+                    onkeydown="handleEnter(event)"
+                ></textarea>
+                
+                <button id="sendBtn" onclick="sendMessage()" class="absolute right-2 bottom-2 p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-95 flex items-center justify-center w-10 h-10">
+                    <i class="ph ph-paper-plane-right text-lg"></i>
+                </button>
+            </div>
+            <div class="text-center mt-2">
+                <p class="text-xs text-gray-400 dark:text-gray-500">AI can make mistakes. Check important info.</p>
+            </div>
+        </div>
+    </main>
+</div>
+
+<div id="settingsModal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeSettings()"></div>
+    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white dark:bg-[#1E1E1E] rounded-2xl shadow-2xl p-6 m-4">
+        <h2 class="text-xl font-semibold mb-6 flex items-center gap-2">
+            <i class="ph ph-sliders text-blue-500"></i> Settings
+        </h2>
+        
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">OpenAI API Key</label>
+                <input type="password" id="apiKeyInput" placeholder="sk-..." class="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Model ID</label>
+                <input type="text" id="modelInput" value="gpt-3.5-turbo" placeholder="e.g. gpt-4, gpt-3.5-turbo" class="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">System Prompt</label>
+                <textarea id="systemPromptInput" rows="3" class="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none" placeholder="You are a helpful assistant..."></textarea>
+            </div>
+        </div>
+
+        <div class="mt-8 flex justify-end gap-3">
+            <button onclick="closeSettings()" class="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">Cancel</button>
+            <button onclick="saveSettings()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium shadow-lg shadow-blue-500/30">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// --- State ---
+const state = { chats: [], currentChatId:null, apiKey:'', model:'gpt-3.5-turbo', systemPrompt:'You are a helpful AI assistant.', isGenerating:false, darkMode:false };
+const els = { app:document.getElementById('app'), loading:document.getElementById('loading'), messagesContainer:document.getElementById('messagesContainer'), welcomeState:document.getElementById('welcomeState'), promptInput:document.getElementById('promptInput'), sendBtn:document.getElementById('sendBtn'), chatHistory:document.getElementById('chatHistory'), sidebar:document.getElementById('sidebar'), sidebarOverlay:document.getElementById('sidebarOverlay'), settingsModal:document.getElementById('settingsModal'), apiKeyInput:document.getElementById('apiKeyInput'), modelInput:document.getElementById('modelInput'), systemPromptInput:document.getElementById('systemPromptInput'), themeIcon:document.getElementById('themeIcon'), themeText:document.getElementById('themeText'), scrollBtn:document.getElementById('scrollBtn') };
+
+// --- Init ---
+document.addEventListener('DOMContentLoaded', ()=>{ loadSettings(); loadHistory(); initTheme(); setTimeout(()=>{ els.loading.classList.add('opacity-0','pointer-events-none'); els.app.classList.remove('hidden'); setTimeout(()=>els.loading.remove(),500); },500); marked.setOptions({ highlight:(code,lang)=>{ const language = hljs.getLanguage(lang)?lang:'plaintext'; return hljs.highlight(code,{language}).value; }, langPrefix:'hljs language-', breaks:true }); });
+
+// --- Settings ---
+function loadSettings(){ state.apiKey=localStorage.getItem('or_api_key')||''; state.model=localStorage.getItem('or_model')||'gpt-3.5-turbo'; state.systemPrompt=localStorage.getItem('or_sys_prompt')||'You are a helpful AI assistant.'; state.darkMode=localStorage.getItem('theme')==='dark'; }
+function saveSettings(){ state.apiKey=els.apiKeyInput.value.trim(); state.model=els.modelInput.value.trim(); state.systemPrompt=els.systemPromptInput.value.trim(); localStorage.setItem('or_api_key',state.apiKey); localStorage.setItem('or_model',state.model); localStorage.setItem('or_sys_prompt',state.systemPrompt); closeSettings(); alert('Settings Saved!'); }
+function openSettings(){ els.apiKeyInput.value=state.apiKey; els.modelInput.value=state.model; els.systemPromptInput.value=state.systemPrompt; els.settingsModal.classList.remove('hidden'); closeSidebarMobile(); }
+function closeSettings(){ els.settingsModal.classList.add('hidden'); }
+
+// --- Theme ---
+function initTheme(){ if(state.darkMode){ document.documentElement.classList.add('dark'); els.themeText.innerText='Light Mode'; els.themeIcon.classList.replace('ph-moon','ph-sun'); }else{ document.documentElement.classList.remove('dark'); } }
+function toggleDarkMode(){ state.darkMode=!state.darkMode; localStorage.setItem('theme',state.darkMode?'dark':'light'); initTheme(); }
+
+// --- Chat History ---
+function loadHistory(){ const saved=localStorage.getItem('chat_history'); if(saved){ state.chats=JSON.parse(saved); } renderSidebar(); }
+function saveHistory(){ localStorage.setItem('chat_history',JSON.stringify(state.chats)); renderSidebar(); }
+function createNewChat(){ const newChat={id:Date.now().toString(),title:'New Chat',messages:[],timestamp:Date.now()}; state.chats.unshift(newChat); state.currentChatId=newChat.id; saveHistory(); renderMessages(); closeSidebarMobile(); els.promptInput.focus(); }
+function selectChat(id){ state.currentChatId=id; renderMessages(); closeSidebarMobile(); }
+function deleteChat(e,id){ e.stopPropagation(); if(!confirm('Delete this chat?')) return; state.chats=state.chats.filter(c=>c.id!==id); if(state.currentChatId===id){ state.currentChatId=null; renderMessages(); } saveHistory(); }
+function renameChat(e,id){ e.stopPropagation(); const chat=state.chats.find(c=>c.id===id); const newTitle=prompt('Rename chat:',chat.title); if(newTitle){ chat.title=newTitle; saveHistory(); } }
+
+// --- Render ---
+function renderSidebar(){ els.chatHistory.innerHTML=state.chats.map(chat=>`<div onclick="selectChat('${chat.id}')" class="group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${state.currentChatId===chat.id?'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400':'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'}"><div class="flex items-center gap-3 overflow-hidden"><i class="ph ph-chat-circle text-lg shrink-0"></i><span class="text-sm font-medium truncate">${chat.title}</span></div><div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button onclick="renameChat(event,'${chat.id}')" class="p-1 hover:text-blue-500"><i class="ph ph-pencil"></i></button><button onclick="deleteChat(event,'${chat.id}')" class="p-1 hover:text-red-500"><i class="ph ph-trash"></i></button></div></div>`).join(''); }
+
+function renderMessages(){ if(!state.currentChatId){ els.welcomeState.style.display='flex'; els.messagesContainer.innerHTML=''; els.messagesContainer.appendChild(els.welcomeState); return; } const chat=state.chats.find(c=>c.id===state.currentChatId); if(!chat) return; els.welcomeState.style.display='none'; els.messagesContainer.innerHTML=chat.messages.map(msg=>`<div class="flex flex-col ${msg.role==='user'?'items-end':'items-start'} animate-fade-in"><div class="max-w-[85%] md:max-w-[75%] rounded-2xl px-5 py-3.5 ${msg.role==='user'?'bg-gray-100 dark:bg-[#2A2A2A] text-gray-900 dark:text-gray-100 rounded-br-none':'text-gray-800 dark:text-gray-200 prose dark:prose-invert prose-p:my-1 prose-pre:my-2 w-full'}">${msg.role==='user'?escapeHtml(msg.content):marked.parse(msg.content)}</div></div>`).join(''); document.querySelectorAll('pre code').forEach((block)=>{ hljs.highlightElement(block); }); scrollToBottom(); }
+
+// --- Send
