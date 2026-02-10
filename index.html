@@ -4,19 +4,24 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vexa AI</title>
+
 <script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Fira+Code:wght@400&display=swap" rel="stylesheet">
+
 <style>
-html, body {height:100%;margin:0;font-family:Inter,sans-serif;transition:background 0.3s,color 0.3s;}
-.dark {background:#1E1E1E;color:#fff;}
-.bg-white{background:#f9f9f9;}
-textarea:focus {outline:none;}
-.loader {border:4px solid #f3f3f3;border-top:4px solid #3498db;border-radius:50%;width:30px;height:30px;animation:spin 1s linear infinite;}
-@keyframes spin {0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
-.scrollbtn {position:absolute;right:20px;bottom:80px;padding:8px;border-radius:999px;background:#3498db;color:#fff;display:none;}
+html,body{height:100%;margin:0;font-family:Inter,sans-serif;transition:background 0.3s,color 0.3s;}
+.dark{background:#1E1E1E;color:#fff;}
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px;}
+.dark ::-webkit-scrollbar-thumb{background:#374151;}
+.loader{border:4px solid #f3f3f3;border-top:4px solid #3498db;border-radius:50%;width:30px;height:30px;animation:spin 1s linear infinite;}
+@keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
 </style>
 </head>
-<body class="bg-white">
 
+<body class="bg-white dark:bg-[#1E1E1E] text-gray-800 dark:text-gray-100">
+
+<!-- Name Prompt -->
 <div id="namePrompt" class="fixed inset-0 flex items-center justify-center bg-white dark:bg-[#1E1E1E] z-50">
   <div class="p-6 bg-gray-100 dark:bg-gray-800 rounded-xl shadow-lg w-80 text-center">
     <h2 class="text-lg font-semibold mb-4">Welcome to Vexa AI</h2>
@@ -25,85 +30,127 @@ textarea:focus {outline:none;}
   </div>
 </div>
 
-<div id="app" class="hidden h-full flex flex-col">
-  <div class="flex-1 overflow-y-auto p-4" id="messagesContainer"></div>
+<!-- Main App -->
+<div id="app" class="hidden flex h-full">
 
-  <div class="p-4 bg-gray-100 dark:bg-[#2A2A2A] flex items-center gap-2">
-    <textarea id="promptInput" rows="1" placeholder="Ask anything..." class="flex-1 p-3 rounded-xl dark:bg-gray-700"></textarea>
-    <button onclick="sendMessage()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Send</button>
-  </div>
+  <!-- Sidebar -->
+  <aside class="w-72 bg-gray-50 dark:bg-[#1E1E1E] border-r border-gray-200 dark:border-gray-700 flex flex-col">
+    <div class="p-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
+      <button onclick="createNewChat()" class="flex-1 flex items-center gap-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 px-4 py-2.5 rounded-full text-sm font-medium">
+        <span>New Chat</span>
+      </button>
+    </div>
+    <div id="chatHistory" class="flex-1 overflow-y-auto p-3 space-y-1"></div>
+    <div class="p-4 border-t border-gray-200 dark:border-gray-700">
+      <button onclick="toggleDarkMode()" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-sm">
+        🌗 <span id="themeText">Dark Mode</span>
+      </button>
+    </div>
+  </aside>
 
-  <button id="scrollBtn" class="scrollbtn" onclick="scrollToBottom()">↓</button>
-  <button onclick="toggleDarkMode()" class="fixed top-4 right-4 bg-gray-300 dark:bg-gray-700 p-2 rounded-lg">🌓</button>
+  <!-- Chat Main -->
+  <main class="flex-1 flex flex-col h-full w-full relative">
+
+    <div id="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth"></div>
+
+    <div class="p-4 bg-gray-100 dark:bg-[#2A2A2A] flex items-center gap-2">
+      <textarea id="promptInput" rows="1" placeholder="Ask anything..." class="flex-1 p-3 rounded-xl dark:bg-gray-700" oninput="autoResize(this)" onkeydown="handleEnter(event)"></textarea>
+      <button onclick="sendMessage()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Send</button>
+    </div>
+
+  </main>
 </div>
 
 <script>
 let userName = "";
-const backendURL = "https://tlkytdfh9pbtbwj0.public.blob.vercel-storage.com/api.js";
+const backendURL = "https://tlkytdfh9pbtbwj0.public.blob.vercel-storage.com/api.js"; // <- REPLACE with your real backend
 
-const state = { messages: [] };
+const state = { chats: [], currentChatId: null, isGenerating: false };
 
+// ----------------- Name Prompt -----------------
 function saveName(){
   const input = document.getElementById("userNameInput").value.trim();
-  if(!input) return alert("Please enter a name!");
+  if(!input) return alert("Enter your name!");
   userName = input;
   document.getElementById("namePrompt").style.display = "none";
   document.getElementById("app").classList.remove("hidden");
-  addMessage("system", `Hello ${userName}, I am Vexa AI. How can I help you today?`);
+  createNewChat();
 }
 
-function addMessage(role, text){
-  state.messages.push({role,text});
+// ----------------- Sidebar -----------------
+function createNewChat(){
+  const chat = { id: Date.now().toString(), title: "New Chat", messages: [] };
+  state.chats.unshift(chat);
+  state.currentChatId = chat.id;
+  renderSidebar();
+  renderMessages();
+}
+
+function renderSidebar(){
+  const container = document.getElementById("chatHistory");
+  container.innerHTML = state.chats.map(c=>{
+    return `<div onclick="selectChat('${c.id}')" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer">${c.title}</div>`;
+  }).join("");
+}
+
+function selectChat(id){ state.currentChatId=id; renderMessages(); }
+
+// ----------------- Chat -----------------
+function addMessage(role,text){
+  const chat = state.chats.find(c=>c.id===state.currentChatId);
+  chat.messages.push({role,text});
   renderMessages();
 }
 
 function renderMessages(){
   const container = document.getElementById("messagesContainer");
-  container.innerHTML = "";
-  state.messages.forEach(msg=>{
-    const div = document.createElement("div");
-    div.className = "mb-3";
-    if(msg.role==="user") div.innerHTML=`<div class="text-right"><span class="inline-block bg-blue-100 dark:bg-blue-900 p-2 rounded-xl">${msg.text}</span></div>`;
-    else div.innerHTML=`<div class="text-left"><span class="inline-block bg-gray-200 dark:bg-gray-700 p-2 rounded-xl">${msg.text}</span></div>`;
-    container.appendChild(div);
-  });
-  scrollToBottom();
+  if(!state.currentChatId) return;
+  const chat = state.chats.find(c=>c.id===state.currentChatId);
+  container.innerHTML = chat.messages.map(m=>{
+    if(m.role==="user") return `<div class="text-right"><span class="inline-block bg-blue-100 dark:bg-blue-900 p-2 rounded-xl">${m.text}</span></div>`;
+    return `<div class="text-left"><span class="inline-block bg-gray-200 dark:bg-gray-700 p-2 rounded-xl">${m.text}</span></div>`;
+  }).join("");
+  container.scrollTop = container.scrollHeight;
 }
 
+// ----------------- Send Message -----------------
 async function sendMessage(){
-  const input = document.getElementById("promptInput");
-  const text = input.value.trim();
-  if(!text) return;
-  input.value="";
-  addMessage("user", text);
+  const input=document.getElementById("promptInput");
+  const text=input.value.trim();
+  if(!text || state.isGenerating) return;
+  input.value=""; autoResize(input);
+  addMessage("user",text);
+  state.isGenerating=true;
 
-  const loader = document.createElement("div");
-  loader.className="loader mb-3";
-  document.getElementById("messagesContainer").appendChild(loader);
-  scrollToBottom();
+  // loader
+  const container = document.getElementById("messagesContainer");
+  const loader=document.createElement("div"); loader.className="loader"; container.appendChild(loader); container.scrollTop=container.scrollHeight;
 
   try{
-    const res = await fetch(backendURL,{
+    const res=await fetch(backendURL,{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({message:text})
     });
-    const data = await res.json();
-    addMessage("assistant", data.reply || "Sorry, no response");
-  } catch(err){
+    const data=await res.json();
+    addMessage("assistant",data.reply || "No response from AI");
+  }catch(e){
     addMessage("assistant","Error connecting to backend");
+  }finally{
+    loader.remove();
+    state.isGenerating=false;
   }
-  loader.remove();
 }
 
-function scrollToBottom(){
-  const c = document.getElementById("messagesContainer");
-  c.scrollTop = c.scrollHeight;
-}
+// ----------------- Helpers -----------------
+function handleEnter(e){ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); sendMessage(); } }
+function autoResize(el){ el.style.height='auto'; el.style.height=el.scrollHeight+'px'; }
 
+// ----------------- Dark Mode -----------------
 function toggleDarkMode(){
   document.body.classList.toggle("dark");
+  document.getElementById("themeText").innerText = document.body.classList.contains("dark") ? "Light Mode":"Dark Mode";
 }
 </script>
 </body>
-  </html>
+                                                                                                                    </html>
